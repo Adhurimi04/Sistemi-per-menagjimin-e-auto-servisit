@@ -158,8 +158,6 @@ img {
   display: none;
 }
 
-/* BUTTONS */
-
 .btn {
   display: inline-flex;
   justify-content: center;
@@ -202,8 +200,6 @@ img {
   border-color: var(--red);
   background: rgba(255, 41, 56, 0.08);
 }
-
-/* HERO */
 
 .hero {
   min-height: 640px;
@@ -320,8 +316,6 @@ img {
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* GENERAL SECTIONS */
-
 .section {
   padding: 100px 0;
 }
@@ -358,8 +352,6 @@ img {
   color: var(--text);
   font-size: 12px;
 }
-
-/* SERVICE CARDS */
 
 .services-grid {
   display: grid;
@@ -430,8 +422,6 @@ img {
 .service-link:hover {
   color: var(--red);
 }
-
-/* ABOUT */
 
 .about {
   border-top: 1px solid var(--border);
@@ -518,8 +508,6 @@ img {
   flex-shrink: 0;
 }
 
-/* WHY US */
-
 .stats-section {
   padding: 95px 0;
   background:
@@ -565,8 +553,6 @@ img {
   color: var(--text);
   font-size: 10px;
 }
-
-/* BOOKING */
 
 .booking-section {
   position: relative;
@@ -731,8 +717,6 @@ img {
   padding-top: 8px;
 }
 
-/* CONTACT */
-
 .contact-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -800,8 +784,6 @@ img {
   font-size: 10px;
 }
 
-/* FOOTER */
-
 .footer {
   border-top: 1px solid var(--border);
   background: #06080b;
@@ -845,8 +827,6 @@ img {
   font-size: 9px;
 }
 
-/* TABLET */
-
 @media (max-width: 1000px) {
   .nav-links {
     gap: 16px;
@@ -868,8 +848,6 @@ img {
     padding: 17px 12px;
   }
 }
-
-/* MOBILE NAVIGATION */
 
 @media (max-width: 760px) {
   .navbar {
@@ -1014,8 +992,6 @@ img {
   }
 }
 
-/* SMALL PHONES */
-
 @media (max-width: 480px) {
   .container {
     width: 91%;
@@ -1147,8 +1123,6 @@ img {
     gap: 8px;
   }
 }
-
-/* REDUCED MOTION */
 
 @media (prefers-reduced-motion: reduce) {
   *,
