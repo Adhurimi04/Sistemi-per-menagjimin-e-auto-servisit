@@ -364,19 +364,48 @@
       today.getTime() - today.getTimezoneOffset() * 60000
     ).toISOString().split("T")[0];
     dateInput.min = localToday;
-
-    // Formular demonstrues: nuk dërgon rezervim në server
  
-      event.preventDefault();
+      const bookingForm = document.getElementById("booking-form");
+const status = document.getElementById("form-status");
 
-      const name = document.getElementById("name").value.trim();
-      const status = document.getElementById("form-status");
+bookingForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-      status.textContent =
-        "Faleminderit, " + name +
-        "! Formulari u plotësua, por kërkesa nuk është dërguar te autoservisi. " +
-        "Lidhe formularin me email ose backend për të pranuar rezervime reale.";
-      status.classList.add("form-message");
+  const formData = {
+    name: document.getElementById("name").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    service: document.getElementById("service").value,
+    date: document.getElementById("date").value,
+    car: document.getElementById("car").value.trim(),
+    message: document.getElementById("message").value.trim()
+  };
+
+  status.textContent = "Duke dërguar kërkesën...";
+
+  try {
+    const response = await fetch('backend/process-booking.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      status.textContent = "Faleminderit, " + formData.name + "! Kërkesa juaj u dërgua me sukses.";
+      status.style.color = "green";
+      bookingForm.reset();
+    } else {
+      status.textContent = "Gabim: " + (result.message || "Provoni përsëri.");
+      status.style.color = "red";
+    }
+  } catch (err) {
+    status.textContent = "Nuk u arrit lidhja me serverin.";
+    status.style.color = "red";
+  }
+});
     ;
   </script>
 
