@@ -39,7 +39,7 @@ if (!empty($data['title']) && !empty($data['vehicle_id'])) {
         $new_task_id = $conn->insert_id;
 
         // 4. Dërgimi i Email-it përmes Resend API
-        $resendApiKey = "re_XQALHH4A_KcGsBkHaFvTbLeXnjcu4EHdJ"; // Vendos këtu API Key nga Resend (fillon me re_)
+        $resendApiKey = "re_yQRsH78D_77y8gtWRJvqQoh38eMxkAEvT"; // Vendos këtu API Key nga Resend (fillon me re_)
 
         $emailData = [
             "from" => "Auto Pro <onboarding@resend.dev>",
