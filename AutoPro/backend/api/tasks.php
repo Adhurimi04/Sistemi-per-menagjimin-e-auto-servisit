@@ -5,19 +5,11 @@ header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST");
 
-// Përfshirja e klasave të PHPMailer
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require __DIR__ . '/PHPMailer/src/Exception.php';
-require __DIR__ . '/PHPMailer/src/PHPMailer.php';
-require __DIR__ . '/PHPMailer/src/SMTP.php';
-
-// 1. Lidhja me Databazën MySQL të XAMPP
+// 1. Lidhja me Databazën MySQL në XAMPP
 $host = "localhost";
 $db_user = "root";
 $db_pass = "";
-$db_name = "autopro_db"; // Emri i databazës tuaj
+$db_name = "autopro_db"; // Emri i databazës suaj
 
 $conn = new mysqli($host, $db_user, $db_pass, $db_name);
 
@@ -31,7 +23,7 @@ if ($conn->connect_error) {
     exit();
 }
 
-// 2. Marrja e të dhënave nga kërkesa HTTP (POST JSON)
+// 2. Pranim i të dhënave JSON nga Postman
 $data = json_decode(file_get_contents("php://input"), true);
 
 if (!empty($data['title']) && !empty($data['vehicle_id'])) {
@@ -46,44 +38,26 @@ if (!empty($data['title']) && !empty($data['vehicle_id'])) {
     if ($conn->query($sql) === TRUE) {
         $new_task_id = $conn->insert_id;
 
-        // 4. Dërgimi i Email-it me PHPMailer
-        $mail = new PHPMailer(true);
-        $email_sent = false;
+        // 4. Dërgimi i njoftimit menjëherë te telefoni yt përmes Telegram Bot
+        // Krijimi i bot-it merr vetëm 1 minutë në Telegram me @BotFather
+        $botToken = "TOKENI_YT_NGA_BOTFATHER"; 
+        $chatID = "CHAT_ID_JUAJ"; 
 
-        try {
-            // Konfigurimi i Serverit SMTP të Gmail
-            $mail->isSMTP();
-            $mail->Host       = 'smtp.gmail.com';
-            $mail->SMTPAuth   = true;
-            $mail->Username   = 'adhurimmehmetii2006@gmail.com';
-            
-            // Këtu vendos kodin 16-shifror nga Google (pa hapësira)
-            $mail->Password   = twkerzyzltgiurcp; 
-            
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = 587;
+        $messageText = "🚗 [Auto Pro Notification]\n"
+                     . "Është krijuar një detyrë e re servisi #{$new_task_id}!\n"
+                     . "Titulli: {$title}\n"
+                     . "Vetura ID: {$vehicle_id}\n"
+                     . "Kontakt: 045916042";
 
-            // Marrësi dhe Dërguesi
-            $mail->setFrom('adhurimmehmetii2006@gmail.com', 'Auto Pro System');
-            $mail->addAddress('adhurimmehmetii2006@gmail.com');
-
-            // Përmbajtja e Email-it
-            $mail->isHTML(false);
-            $mail->Subject = "Auto Pro - Detyre e re Servisi #{$new_task_id}";
-            $mail->Body    = "Përshëndetje,\n\nËshtë krijuar një detyrë e re për servisin: {$title} (Vetura ID: {$vehicle_id}).\n\nNumri i kontaktit: 045916042";
-
-            $mail->send();
-            $email_sent = true;
-        } catch (Exception $e) {
-            $email_error_message = $mail->ErrorInfo;
-        }
+        $url = "https://api.telegram.org/bot{$botToken}/sendMessage?chat_id={$chatID}&text=" . urlencode($messageText);
+        
+        // Ekzekutimi i kërkesës HTTP për mesazhin
+        @file_get_contents($url);
 
         http_response_code(201);
         echo json_encode([
             "success" => true,
-            "message" => $email_sent 
-                ? "Task-u u ruajt me sukses në databazë dhe njoftimi u dërgua në email!" 
-                : "Task-u u ruajt, por email-i dështoi: " . ($email_error_message ?? 'Gabim SMTP'),
+            "message" => "Task-u u ruajt me sukses në databazë dhe njoftimi u dërgua në telefon!",
             "task_id" => $new_task_id
         ]);
     } else {
