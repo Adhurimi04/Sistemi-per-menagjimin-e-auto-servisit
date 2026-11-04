@@ -9,7 +9,7 @@ header("Access-Control-Allow-Methods: POST");
 $host = "localhost";
 $db_user = "root";
 $db_pass = "";
-$db_name = "autopro_db"; // Emri i databazës suaj
+$db_name = "autopro_db";
 
 $conn = new mysqli($host, $db_user, $db_pass, $db_name);
 
@@ -39,10 +39,10 @@ if (!empty($data['title']) && !empty($data['vehicle_id'])) {
         $new_task_id = $conn->insert_id;
 
         // 4. Dërgimi i Email-it përmes Resend API
-        $resendApiKey = "re_yQRsH78D_77y8gtWRJvqQoh38eMxkAEvT"; // Vendos këtu API Key nga Resend (fillon me re_)
+        $resendApiKey = "re_yQRsH78D_77y8gtWRJvqQoh38eMxkAEvT";
 
         $emailData = [
-            "from" => "Auto Pro <onboarding@resend.dev>",
+            "from" => "onboarding@resend.dev",
             "to" => ["adhurimmehmetii2006@gmail.com"],
             "subject" => "Auto Pro - Detyrë e re Servisi #{$new_task_id}",
             "html" => "
@@ -66,8 +66,13 @@ if (!empty($data['title']) && !empty($data['vehicle_id'])) {
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($emailData));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        
+        // Zgjidhja për mjedisin lokal XAMPP (Bypass SSL verification në localhost)
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
+        $curlError = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
@@ -78,8 +83,10 @@ if (!empty($data['title']) && !empty($data['vehicle_id'])) {
             "success" => true,
             "message" => $email_sent 
                 ? "Task-u u ruajt me sukses në databazë dhe email-i u dërgua!" 
-                : "Task-u u ruajt në databazë, por email-i dështoi (Kontrollo Resend Key).",
-            "task_id" => $new_task_id
+                : "Task-u u ruajt në databazë, por dërgimi i email-it dështoi.",
+            "task_id" => $new_task_id,
+            "resend_http_code" => $httpCode,
+            "resend_details" => json_decode($response) ?? $curlError
         ]);
     } else {
         http_response_code(500);
