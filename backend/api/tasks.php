@@ -3,7 +3,7 @@
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -136,6 +136,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         "status" => $status
     ]);
     $update->close();
+    $conn->close();
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+
+    if (!$id || $id < 1) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "ID e detyrës nuk është e vlefshme."
+        ]);
+        $conn->close();
+        exit();
+    }
+
+    $delete = $conn->prepare("DELETE FROM service_tasks WHERE id = ?");
+    if ($delete === false) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "message" => "Përgatitja e fshirjes dështoi: " . $conn->error
+        ]);
+        $conn->close();
+        exit();
+    }
+
+    $delete->bind_param("i", $id);
+    if (!$delete->execute()) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "message" => "Fshirja e detyrës dështoi: " . $delete->error
+        ]);
+        $delete->close();
+        $conn->close();
+        exit();
+    }
+
+    if ($delete->affected_rows === 0) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "message" => "Detyra nuk u gjet."
+        ]);
+        $delete->close();
+        $conn->close();
+        exit();
+    }
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Detyra u fshi me sukses."
+    ]);
+    $delete->close();
     $conn->close();
     exit();
 }

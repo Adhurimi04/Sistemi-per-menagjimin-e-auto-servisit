@@ -213,6 +213,16 @@
           <h2>Detyrat e <span>servisit.</span></h2>
           <p>Lista e detyrave të regjistruara në sistemin AUTO PRO.</p>
         </div>
+        <div class="task-filter-bar">
+          <label for="task-status-filter">Filtro sipas statusit</label>
+          <select id="task-status-filter">
+            <option value="all">Të gjitha detyrat</option>
+            <option value="TODO">Në pritje</option>
+            <option value="IN_PROGRESS">Në punë</option>
+            <option value="DONE">Përfunduar</option>
+          </select>
+          <span id="task-count" aria-live="polite"></span>
+        </div>
         <div class="task-list" id="task-list" aria-live="polite">
           <p class="empty-state">Duke ngarkuar detyrat...</p>
         </div>

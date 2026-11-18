@@ -17,6 +17,10 @@ Faqe për autoservis me regjistrim/kyçje të klientëve, role administratori dh
 
    Dil dhe kyçu përsëri që ndryshimi i rolit të hyjë në fuqi.
 
+### Databaza e detyrave të servisit
+
+Lista e detyrave përdor databazën `autopro_db`, veçmas databazës `auto pro` të llogarive dhe rezervimeve. Importo `backend/autopro_db.sql` nga phpMyAdmin ose me komandën `mysql` për të krijuar tabelën `service_tasks` dhe për të ngarkuar të dhënat e eksportuara.
+
 ## Funksionet
 
 - Klientët mund të rezervojnë termin dhe të shohin historikun dhe statusin e rezervimeve të tyre.
@@ -33,7 +37,7 @@ Vlerat parazgjedhje funksionojnë për instalimin lokal standard të XAMPP. Për
 - `AUTO_PRO_DB_USER`
 - `AUTO_PRO_DB_PASSWORD`
 
-Nëse përdoret endpoint-i i vjetër `backend/api/tasks.php`, cakto edhe `RESEND_API_KEY` në mjedisin e PHP-së. Mos vendos çelësa privatë në kod ose në Git.
+Nëse krijohen detyra përmes `backend/api/tasks.php`, cakto `RESEND_API_KEY` në mjedisin e PHP-së për njoftimet email. Mos vendos çelësa privatë në kod ose në Git.
 
 ## Endpoint-et e aplikacionit
 
@@ -41,3 +45,4 @@ Nëse përdoret endpoint-i i vjetër `backend/api/tasks.php`, cakto edhe `RESEND
 - `backend/api/services.php` — listimi dhe menaxhimi i shërbimeve.
 - `backend/api/bookings.php` — krijimi, historiku dhe përditësimi i rezervimeve.
 - `backend/api/users.php` — listimi i përdoruesve dhe menaxhimi i roleve nga administratori.
+- `backend/api/tasks.php` — listimi, krijimi, ndryshimi i statusit dhe fshirja e detyrave të servisit.

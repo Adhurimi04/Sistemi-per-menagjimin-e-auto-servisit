@@ -1451,6 +1451,33 @@ img {
   margin-inline: auto;
 }
 
+.task-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: 860px;
+  margin: 0 auto 18px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.task-filter-bar select {
+  min-height: 40px;
+  padding: 8px 34px 8px 12px;
+  border: 1px solid #2a3039;
+  border-radius: 7px;
+  background: #151920;
+  color: var(--white);
+  color-scheme: dark;
+}
+
+#task-count {
+  min-width: 105px;
+  color: var(--muted);
+  text-align: right;
+}
+
 .task-card {
   padding: 19px 21px;
   border: 1px solid var(--border);
@@ -1511,6 +1538,34 @@ img {
 
 .task-card .booking-detail {
   margin-top: 9px;
+}
+
+.task-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.task-delete-button {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 41, 56, 0.35);
+  border-radius: 7px;
+  background: rgba(255, 41, 56, 0.08);
+  color: #ff9ba3;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.task-delete-button:hover {
+  border-color: var(--red);
+  background: rgba(255, 41, 56, 0.16);
+}
+
+.task-delete-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .booking-card-heading {

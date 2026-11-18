@@ -20,6 +20,7 @@ const bookingAuthRequired = document.getElementById("booking-auth-required");
 const serviceSelect = document.getElementById("service");
 const apiBase = "../backend/api/";
 let csrfToken;
+let serviceTasks = [];
 
 const taskStatusLabels = {
   TODO: "Në pritje",
@@ -37,48 +38,8 @@ async function loadTasks() {
       throw new Error(result.message || "Lista e detyrave nuk u ngarkua.");
     }
 
-    if (!result.data.length) {
-      taskList.replaceChildren(
-        Object.assign(document.createElement("p"), {
-          className: "empty-state",
-          textContent: "Nuk ka detyra të regjistruara.",
-        })
-      );
-      return;
-    }
-
-    const cards = result.data.map((task) => {
-      const card = document.createElement("article");
-      card.className = "task-card";
-
-      const heading = document.createElement("div");
-      heading.className = "task-card-heading";
-
-      const title = document.createElement("h3");
-      title.textContent = `#${task.id} – ${task.title}`;
-
-      const isKnownStatus = Object.hasOwn(taskStatusLabels, task.status);
-      const status = document.createElement(isKnownStatus ? "button" : "span");
-      status.className = `task-status task-status-${task.status}`;
-      if (isKnownStatus) {
-        status.type = "button";
-        status.dataset.taskId = task.id;
-        status.dataset.status = task.status;
-        status.title = "Kliko për të ndryshuar statusin";
-        status.setAttribute("aria-label", `Ndrysho statusin: ${taskStatusLabels[task.status]}`);
-      }
-      status.textContent = taskStatusLabels[task.status] || task.status;
-      heading.append(title, status);
-
-      const details = document.createElement("p");
-      details.className = "booking-detail";
-      details.textContent =
-        `Vetura #${task.vehicle_id} · Mekaniku #${task.assigned_to || "Pa caktuar"}`;
-
-      card.append(heading, details);
-      return card;
-    });
-    taskList.replaceChildren(...cards);
+    serviceTasks = result.data;
+    renderTasks();
   } catch (error) {
     console.error("Could not load service tasks:", error);
     taskList.replaceChildren(
@@ -88,12 +49,118 @@ async function loadTasks() {
           error instanceof Error ? error.message : "Lista e detyrave nuk u ngarkua.",
       })
     );
+    document.getElementById("task-count").textContent = "";
   }
+}
+
+function renderTasks() {
+  const taskList = document.getElementById("task-list");
+  const filter = document.getElementById("task-status-filter").value;
+  const filteredTasks =
+    filter === "all"
+      ? serviceTasks
+      : serviceTasks.filter((task) => task.status === filter);
+  document.getElementById("task-count").textContent =
+    `${filteredTasks.length} nga ${serviceTasks.length} detyra`;
+
+  if (!filteredTasks.length) {
+    taskList.replaceChildren(
+      Object.assign(document.createElement("p"), {
+        className: "empty-state",
+        textContent: serviceTasks.length
+          ? "Nuk ka detyra me këtë status."
+          : "Nuk ka detyra të regjistruara.",
+      })
+    );
+    return;
+  }
+
+  const cards = filteredTasks.map((task) => {
+    const card = document.createElement("article");
+    card.className = "task-card";
+
+    const heading = document.createElement("div");
+    heading.className = "task-card-heading";
+
+    const title = document.createElement("h3");
+    title.textContent = `#${task.id} – ${task.title}`;
+
+    const isKnownStatus = Object.hasOwn(taskStatusLabels, task.status);
+    const status = document.createElement(isKnownStatus ? "button" : "span");
+    status.className = `task-status task-status-${task.status}`;
+    if (isKnownStatus) {
+      status.type = "button";
+      status.dataset.taskId = task.id;
+      status.dataset.status = task.status;
+      status.title = "Kliko për të ndryshuar statusin";
+      status.setAttribute("aria-label", `Ndrysho statusin: ${taskStatusLabels[task.status]}`);
+    }
+    status.textContent = taskStatusLabels[task.status] || task.status;
+    heading.append(title, status);
+
+    const details = document.createElement("p");
+    details.className = "booking-detail";
+    details.textContent =
+      `Vetura #${task.vehicle_id} · Mekaniku #${task.assigned_to || "Pa caktuar"}`;
+
+    card.append(heading, details);
+
+    const actions = document.createElement("div");
+    actions.className = "task-card-actions";
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "task-delete-button";
+    deleteButton.dataset.deleteTaskId = task.id;
+    deleteButton.textContent = "Fshi detyrën";
+    deleteButton.setAttribute("aria-label", `Fshi detyrën #${task.id}`);
+    actions.append(deleteButton);
+    card.append(actions);
+    return card;
+  });
+  taskList.replaceChildren(...cards);
 }
 
 loadTasks();
 
+document.getElementById("task-status-filter").addEventListener("change", renderTasks);
+
 document.getElementById("task-list").addEventListener("click", async (event) => {
+  const deleteButton = event.target.closest("button[data-delete-task-id]");
+  if (deleteButton) {
+    const id = Number(deleteButton.dataset.deleteTaskId);
+    if (!window.confirm(`A jeni i sigurt që dëshironi ta fshini detyrën #${id}?`)) {
+      return;
+    }
+
+    const updateStatus = document.getElementById("task-update-status");
+    deleteButton.disabled = true;
+    updateStatus.textContent = "Duke fshirë detyrën...";
+    updateStatus.dataset.state = "pending";
+    try {
+      const response = await fetch(`${apiBase}tasks.php`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Detyra nuk u fshi.");
+      }
+
+      updateStatus.textContent = result.message;
+      updateStatus.dataset.state = "success";
+      await loadTasks();
+    } catch (error) {
+      console.error("Could not delete service task:", error);
+      updateStatus.textContent =
+        error instanceof Error ? error.message : "Gabim gjatë fshirjes së detyrës.";
+      updateStatus.dataset.state = "error";
+    } finally {
+      if (deleteButton.isConnected) deleteButton.disabled = false;
+    }
+    return;
+  }
+
   const button = event.target.closest("button[data-task-id]");
   if (!button) return;
 
