@@ -3,7 +3,7 @@
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Methods: GET, POST");
 
 // 1. Lidhja me Databazën MySQL në XAMPP
 $host = "localhost";
@@ -20,6 +20,48 @@ if ($conn->connect_error) {
         "error" => "DATABASE_ERROR",
         "message" => "Lidhja me databazën dështoi: " . $conn->connect_error
     ]);
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $result = $conn->query(
+        "SELECT id, vehicle_id, assigned_to, title, status
+         FROM service_tasks
+         ORDER BY id DESC"
+    );
+
+    if ($result === false) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "error" => "QUERY_ERROR",
+            "message" => "Dështoi leximi i detyrave: " . $conn->error
+        ]);
+        $conn->close();
+        exit();
+    }
+
+    $tasks = [];
+    while ($task = $result->fetch_assoc()) {
+        $tasks[] = $task;
+    }
+
+    echo json_encode([
+        "success" => true,
+        "data" => $tasks
+    ]);
+    $conn->close();
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode([
+        "success" => false,
+        "error" => "METHOD_NOT_ALLOWED",
+        "message" => "Metoda e kërkesës nuk lejohet."
+    ]);
+    $conn->close();
     exit();
 }
 
