@@ -1,48 +1,71 @@
-# AUTO PRO — Sistemi për menaxhimin e autoservisit
+# AUTO PRO
 
-Faqe për autoservis me regjistrim/kyçje të klientëve, role administratori dhe klienti, menaxhim shërbimesh dhe rezervimesh. Ndërfaqja përdor HTML, CSS dhe JavaScript; backend-i është PHP me MySQL.
+Sistem për menaxhimin e autoservisit. Projekti përdor HTML, CSS dhe JavaScript në frontend, PHP për API-të dhe MySQL/MariaDB për ruajtjen e të dhënave.
 
-## Nisja lokale (XAMPP)
+## Kërkesat
 
-1. Vendose projektin brenda `C:\xampp\htdocs\AutoPro`.
+- XAMPP me Apache, PHP dhe MySQL/MariaDB.
+- PHP me shtesat `mysqli` dhe `PDO_MySQL`.
+- Për dërgimin e njoftimeve për detyrat, PHP duhet ta ketë aktiv shtesën cURL dhe të jetë konfiguruar `RESEND_API_KEY`.
+
+## Instalimi lokal me XAMPP
+
+1. Vendose projektin te `C:\xampp\htdocs\AutoPro`.
 2. Nise Apache dhe MySQL nga XAMPP.
-3. Hape `http://localhost/AutoPro/`. Në konfigurimin lokal të parazgjedhur, aplikacioni lidhet me MySQL si `root` pa fjalëkalim dhe krijon automatikisht databazën `auto pro`, tabelat dhe shërbimet fillestare.
-4. Krijo llogari nga **Regjistrohu**. Çdo llogari e re merr rolin `client`.
-5. Për ta bërë llogarinë tënde administrator, ekzekuto nga PowerShell:
+3. Importo `backend/autopro_db.sql` në phpMyAdmin:
+   - Hape `http://localhost/phpmyadmin`.
+   - Zgjedh **Import**.
+   - Zgjedh skedarin `backend/autopro_db.sql` dhe kliko **Import** ose **Go**.
+4. Hape `http://localhost/AutoPro/` për faqen kryesore ose `http://localhost/AutoPro/frontend/` për frontend-in me listën e detyrave.
+5. Databaza `auto pro`, tabelat e llogarive/rezervimeve dhe shërbimet fillestare krijohen automatikisht kur përdoret aplikacioni.
+6. Krijo llogari nga **Regjistrohu**. Llogaritë e reja marrin rolin `client`.
 
-   ```powershell
-   cd C:\xampp\htdocs\AutoPro
-   & 'C:\xampp\php\php.exe' .\backend\create_admin.php 'emaili-yt@example.com'
-   ```
+> **Kujdes:** Importi i `autopro_db.sql` zëvendëson tabelën `service_tasks` në databazën `autopro_db`. Bëj kopje rezervë para importimit nëse ke të dhëna që dëshiron t'i ruash. Skedari është eksport i të dhënave në momentin kur u krijua; nuk përditësohet automatikisht pas ndryshimeve të mëvonshme në databazë.
 
-   Dil dhe kyçu përsëri që ndryshimi i rolit të hyjë në fuqi.
+### Caktimi i administratorit
 
-### Databaza e detyrave të servisit
+Ekzekuto komandën e mëposhtme në PowerShell, duke zëvendësuar emailin me atë të llogarisë:
 
-Lista e detyrave përdor databazën `autopro_db`, veçmas databazës `auto pro` të llogarive dhe rezervimeve. Importo `backend/autopro_db.sql` nga phpMyAdmin ose me komandën `mysql` për të krijuar tabelën `service_tasks` dhe për të ngarkuar të dhënat e eksportuara.
+```powershell
+cd C:\xampp\htdocs\AutoPro
+& 'C:\xampp\php\php.exe' .\backend\create_admin.php 'emaili-yt@example.com'
+```
 
-## Funksionet
+Dil nga llogaria dhe kyçu përsëri që roli i ri të hyjë në fuqi.
 
-- Klientët mund të rezervojnë termin dhe të shohin historikun dhe statusin e rezervimeve të tyre.
-- Administratorët mund të shohin klientët dhe rezervimet, të ndryshojnë rolet, statuset dhe shënimet, si dhe të shtojnë ose çaktivizojnë shërbime.
-- Rezervimet ruhen në MySQL. EmailJS dërgon njoftimin e rezervimit në adresën e autoservisit.
-- Fjalëkalimet ruhen me hash; API-të përdorin sesione, prepared statements dhe token CSRF për veprimet që ndryshojnë të dhëna.
+## Databazat
 
-## Konfigurimi i databazës
+Projekti përdor dy databaza të ndara:
 
-Vlerat parazgjedhje funksionojnë për instalimin lokal standard të XAMPP. Për konfigurim tjetër, cakto:
+- **`auto pro`** — llogaritë, shërbimet dhe rezervimet. Skema krijohet automatikisht nga `backend/bootstrap.php`.
+- **`autopro_db`** — tabela `service_tasks` për detyrat e servisit. Skema dhe të dhënat fillestare gjenden te `backend/autopro_db.sql`.
+
+Në konfigurimin standard të XAMPP, lidhja e aplikacionit me `auto pro` përdor përdoruesin `root` pa fjalëkalim. Për databazën e aplikacionit mund të caktohen këto variabla mjedisi:
 
 - `AUTO_PRO_DB_HOST`
 - `AUTO_PRO_DB_NAME`
 - `AUTO_PRO_DB_USER`
 - `AUTO_PRO_DB_PASSWORD`
 
-Nëse krijohen detyra përmes `backend/api/tasks.php`, cakto `RESEND_API_KEY` në mjedisin e PHP-së për njoftimet email. Mos vendos çelësa privatë në kod ose në Git.
+Endpoint-i `backend/api/tasks.php` përdor aktualisht `localhost`, përdoruesin `root` pa fjalëkalim dhe databazën `autopro_db`. Për dërgimin e njoftimeve me email gjatë krijimit të detyrës, cakto `RESEND_API_KEY` në mjedisin e PHP-së. Mos vendos çelësa privatë në kod ose në Git.
 
-## Endpoint-et e aplikacionit
+## Funksionet
 
-- `backend/api/auth.php` — regjistrim, kyçje, dalje dhe sesioni aktual.
-- `backend/api/services.php` — listimi dhe menaxhimi i shërbimeve.
-- `backend/api/bookings.php` — krijimi, historiku dhe përditësimi i rezervimeve.
-- `backend/api/users.php` — listimi i përdoruesve dhe menaxhimi i roleve nga administratori.
-- `backend/api/tasks.php` — listimi, krijimi, ndryshimi i statusit dhe fshirja e detyrave të servisit.
+- Klientët mund të regjistrohen, të kyçen, të kërkojnë termine dhe të shohin historikun/statusin e rezervimeve.
+- Administratorët mund të menaxhojnë rezervimet, klientët, rolet dhe shërbimet.
+- Detyrat e servisit ngarkohen nga databaza, filtrohen sipas statusit, mund të përditësohen duke klikuar statusin dhe mund të fshihen pas konfirmimit.
+- Rezervimet ruhen në MySQL. EmailJS dërgon njoftim për rezervimin në adresën e autoservisit.
+
+## API-të
+
+- `backend/api/auth.php` — regjistrim, kyçje, dalje, sesioni aktual dhe token CSRF.
+- `backend/api/bookings.php` — listim, krijim dhe përditësim i rezervimeve.
+- `backend/api/services.php` — listim dhe menaxhim i shërbimeve.
+- `backend/api/users.php` — listim përdoruesish dhe menaxhim i roleve.
+- `backend/api/tasks.php` — detyrat e servisit:
+  - `GET` — liston detyrat.
+  - `POST` — krijon detyrë dhe, nëse është konfiguruar, dërgon njoftim me email.
+  - `PUT` — ndryshon statusin (`TODO`, `IN_PROGRESS`, `DONE`).
+  - `DELETE` — fshin detyrën sipas ID-së.
+
+> **Shënim për publikim:** `tasks.php` nuk kërkon kyçje apo token CSRF për veprimet `POST`, `PUT` dhe `DELETE`. Para publikimit në internet, kufizo këto veprime për përdorues të autorizuar dhe aktivizo mbrojtjen CSRF.
