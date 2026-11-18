@@ -23,7 +23,7 @@ let csrfToken;
 
 const taskStatusLabels = {
   TODO: "Në pritje",
-  IN_PROGRESS: "Në proces",
+  IN_PROGRESS: "Në punë",
   DONE: "Përfunduar",
 };
 
@@ -57,15 +57,23 @@ async function loadTasks() {
       const title = document.createElement("h3");
       title.textContent = `#${task.id} – ${task.title}`;
 
-      const status = document.createElement("span");
+      const isKnownStatus = Object.hasOwn(taskStatusLabels, task.status);
+      const status = document.createElement(isKnownStatus ? "button" : "span");
       status.className = `task-status task-status-${task.status}`;
+      if (isKnownStatus) {
+        status.type = "button";
+        status.dataset.taskId = task.id;
+        status.dataset.status = task.status;
+        status.title = "Kliko për të ndryshuar statusin";
+        status.setAttribute("aria-label", `Ndrysho statusin: ${taskStatusLabels[task.status]}`);
+      }
       status.textContent = taskStatusLabels[task.status] || task.status;
       heading.append(title, status);
 
       const details = document.createElement("p");
       details.className = "booking-detail";
       details.textContent =
-        `Vetura ID: ${task.vehicle_id} · Mekaniku: ${task.assigned_to || "Pa caktuar"}`;
+        `Vetura #${task.vehicle_id} · Mekaniku #${task.assigned_to || "Pa caktuar"}`;
 
       card.append(heading, details);
       return card;
@@ -84,6 +92,49 @@ async function loadTasks() {
 }
 
 loadTasks();
+
+document.getElementById("task-list").addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-task-id]");
+  if (!button) return;
+
+  const nextStatus = {
+    TODO: "IN_PROGRESS",
+    IN_PROGRESS: "DONE",
+    DONE: "TODO",
+  }[button.dataset.status];
+  if (!nextStatus) return;
+
+  const updateStatus = document.getElementById("task-update-status");
+  button.disabled = true;
+  updateStatus.textContent = "Duke përditësuar statusin...";
+  updateStatus.dataset.state = "pending";
+
+  try {
+    const response = await fetch(`${apiBase}tasks.php`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: Number(button.dataset.taskId),
+        status: nextStatus,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Statusi nuk u përditësua.");
+    }
+
+    updateStatus.textContent = result.message;
+    updateStatus.dataset.state = "success";
+    await loadTasks();
+  } catch (error) {
+    console.error("Could not update service task status:", error);
+    updateStatus.textContent =
+      error instanceof Error ? error.message : "Gabim gjatë ndryshimit të statusit.";
+    updateStatus.dataset.state = "error";
+  } finally {
+    if (button.isConnected) button.disabled = false;
+  }
+});
 
 async function initializeBookingForm() {
   const [sessionResponse, servicesResponse, csrfResponse] = await Promise.all([

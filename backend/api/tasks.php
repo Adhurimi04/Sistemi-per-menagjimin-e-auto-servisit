@@ -3,7 +3,13 @@
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST");
+header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit();
+}
 
 // 1. Lidhja me Databazën MySQL në XAMPP
 $host = "localhost";
@@ -50,6 +56,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         "success" => true,
         "data" => $tasks
     ]);
+    $conn->close();
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+    $status = $data['status'] ?? null;
+    $allowedStatuses = ['TODO', 'IN_PROGRESS', 'DONE'];
+
+    if (!$id || $id < 1 || !is_string($status) || !in_array($status, $allowedStatuses, true)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "ID dhe statusi i vlefshëm janë të detyrueshme."
+        ]);
+        $conn->close();
+        exit();
+    }
+
+    $update = $conn->prepare("UPDATE service_tasks SET status = ? WHERE id = ?");
+    if ($update === false) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "message" => "Përgatitja e përditësimit dështoi: " . $conn->error
+        ]);
+        $conn->close();
+        exit();
+    }
+
+    $update->bind_param("si", $status, $id);
+    if (!$update->execute()) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "message" => "Përditësimi i statusit dështoi: " . $update->error
+        ]);
+        $update->close();
+        $conn->close();
+        exit();
+    }
+
+    if ($update->affected_rows === 0) {
+        $check = $conn->prepare("SELECT id FROM service_tasks WHERE id = ?");
+        if ($check === false) {
+            http_response_code(500);
+            echo json_encode([
+                "success" => false,
+                "message" => "Verifikimi i detyrës dështoi: " . $conn->error
+            ]);
+            $update->close();
+            $conn->close();
+            exit();
+        }
+
+        $check->bind_param("i", $id);
+        $check->execute();
+        $check->store_result();
+        $taskExists = $check->num_rows > 0;
+        $check->close();
+
+        if (!$taskExists) {
+            http_response_code(404);
+            echo json_encode([
+                "success" => false,
+                "message" => "Detyra nuk u gjet."
+            ]);
+            $update->close();
+            $conn->close();
+            exit();
+        }
+    }
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Statusi u përditësua!",
+        "status" => $status
+    ]);
+    $update->close();
     $conn->close();
     exit();
 }
