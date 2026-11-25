@@ -171,7 +171,7 @@ function renderUsers(users) {
   const table = element("table", "data-table");
   const head = element("thead");
   const headerRow = element("tr");
-  for (const label of ["Klienti", "Emaili", "Telefoni", "Roli", "Regjistruar", "Veprimi"]) {
+  for (const label of ["Klienti", "Emaili", "Telefoni", "Roli", "Vetura #", "Regjistruar", "Veprimi"]) {
     headerRow.append(element("th", "", label));
   }
   head.append(headerRow);
@@ -182,11 +182,20 @@ function renderUsers(users) {
       user.name,
       user.email,
       user.phone,
-      user.role === "admin" ? "Administrator" : "Klient",
+      user.role === "admin" ? "Administrator" : user.role === "mechanic" ? "Mekanik" : "Klient",
       new Date(user.created_at).toLocaleDateString("sq-XK"),
     ]) {
       row.append(element("td", "", value));
     }
+    const vehicleCell = element("td");
+    const vehicleInput = element("input");
+    vehicleInput.type = "number";
+    vehicleInput.min = "1";
+    vehicleInput.value = user.vehicle_id || "";
+    vehicleInput.dataset.userVehicleId = user.id;
+    vehicleInput.setAttribute("aria-label", `ID e veturës së ${user.name}`);
+    vehicleCell.append(vehicleInput);
+    row.insertBefore(vehicleCell, row.lastChild);
     const action = element("td");
     if (Number(user.id) === Number(currentUser.id)) {
       action.textContent = "Llogaria jote";
@@ -196,6 +205,7 @@ function renderUsers(users) {
       role.setAttribute("aria-label", `Roli i ${user.name}`);
       role.add(new Option("Klient", "client", false, user.role === "client"));
       role.add(new Option("Administrator", "admin", false, user.role === "admin"));
+      role.add(new Option("Mekanik", "mechanic", false, user.role === "mechanic"));
       action.append(role);
     }
     row.append(action);
@@ -372,6 +382,25 @@ document.getElementById("services-list").addEventListener("click", async (event)
 });
 
 document.getElementById("clients-list").addEventListener("change", async (event) => {
+  if (event.target.matches("input[data-user-vehicle-id]")) {
+    const input = event.target;
+    input.disabled = true;
+    try {
+      await request(API.users, {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: Number(input.dataset.userVehicleId),
+          vehicle_id: input.value === "" ? null : Number(input.value),
+        }),
+      });
+      const { users } = await request(API.users);
+      renderUsers(users);
+    } catch (error) {
+      setMessage(document.getElementById("dashboard-status"), error.message, "error");
+      input.disabled = false;
+    }
+    return;
+  }
   if (!event.target.matches("select[data-user-id]")) return;
   const select = event.target;
   select.disabled = true;

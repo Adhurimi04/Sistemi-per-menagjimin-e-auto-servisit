@@ -52,10 +52,20 @@ function app_ensure_schema(PDO $db): void
             email VARCHAR(190) NOT NULL UNIQUE,
             phone VARCHAR(40) NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
-            role ENUM('client', 'admin') NOT NULL DEFAULT 'client',
+            role ENUM('client', 'admin', 'mechanic') NOT NULL DEFAULT 'client',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    $roleColumn = $db->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+    if ($roleColumn && strpos($roleColumn['Type'], "'mechanic'") === false) {
+        $db->exec("ALTER TABLE users MODIFY role ENUM('client', 'admin', 'mechanic') NOT NULL DEFAULT 'client'");
+    }
+
+    $vehicleColumn = $db->query("SHOW COLUMNS FROM users LIKE 'vehicle_id'")->fetch();
+    if (!$vehicleColumn) {
+        $db->exec('ALTER TABLE users ADD COLUMN vehicle_id BIGINT UNSIGNED NULL AFTER role');
+    }
 
     $db->exec(
         "CREATE TABLE IF NOT EXISTS services (
@@ -151,7 +161,7 @@ function app_require_csrf(): void
 {
     $submitted = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     if (!is_string($submitted) || !hash_equals(app_csrf_token(), $submitted)) {
-        app_json_response(['error' => 'Sesioni ka skaduar. Rifresko faqen dhe provo përsëri.'], 419);
+        app_json_response(['error' => 'Sesioni ka skaduar. Rifresko faqen dhe provo përsëri.'], 403);
     }
 }
 
@@ -162,7 +172,7 @@ function app_current_user(PDO $db): ?array
         return null;
     }
 
-    $statement = $db->prepare('SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?');
+    $statement = $db->prepare('SELECT id, name, email, phone, role, vehicle_id, created_at FROM users WHERE id = ?');
     $statement->execute([(int) $userId]);
     $user = $statement->fetch();
     return $user ?: null;

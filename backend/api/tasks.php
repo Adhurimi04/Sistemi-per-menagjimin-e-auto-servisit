@@ -1,297 +1,184 @@
 <?php
-// backend/api/tasks.php
+declare(strict_types=1);
 
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+require_once __DIR__ . '/../bootstrap.php';
+app_start_session();
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit();
 }
 
-// 1. Lidhja me Databazën MySQL në XAMPP
-$host = "localhost";
-$db_user = "root";
-$db_pass = "";
-$db_name = "autopro_db";
+try {
+    $user = app_require_user(app_database());
+    $role = $user['role'];
+    $method = $_SERVER['REQUEST_METHOD'];
 
-$conn = new mysqli($host, $db_user, $db_pass, $db_name);
+    $conn = new mysqli('localhost', 'root', '', 'autopro_db');
+    $conn->set_charset('utf8mb4');
 
-if ($conn->connect_error) {
-    http_response_code(500);
-    echo json_encode([
-        "success" => false,
-        "error" => "DATABASE_ERROR",
-        "message" => "Lidhja me databazën dështoi: " . $conn->connect_error
-    ]);
-    exit();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $result = $conn->query(
-        "SELECT id, vehicle_id, assigned_to, title, status
-         FROM service_tasks
-         ORDER BY id DESC"
-    );
-
-    if ($result === false) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "error" => "QUERY_ERROR",
-            "message" => "Dështoi leximi i detyrave: " . $conn->error
-        ]);
-        $conn->close();
-        exit();
-    }
-
-    $tasks = [];
-    while ($task = $result->fetch_assoc()) {
-        $tasks[] = $task;
-    }
-
-    echo json_encode([
-        "success" => true,
-        "data" => $tasks
-    ]);
-    $conn->close();
-    exit();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
-    $status = $data['status'] ?? null;
-    $allowedStatuses = ['TODO', 'IN_PROGRESS', 'DONE'];
-
-    if (!$id || $id < 1 || !is_string($status) || !in_array($status, $allowedStatuses, true)) {
-        http_response_code(400);
-        echo json_encode([
-            "success" => false,
-            "message" => "ID dhe statusi i vlefshëm janë të detyrueshme."
-        ]);
-        $conn->close();
-        exit();
-    }
-
-    $update = $conn->prepare("UPDATE service_tasks SET status = ? WHERE id = ?");
-    if ($update === false) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "message" => "Përgatitja e përditësimit dështoi: " . $conn->error
-        ]);
-        $conn->close();
-        exit();
-    }
-
-    $update->bind_param("si", $status, $id);
-    if (!$update->execute()) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "message" => "Përditësimi i statusit dështoi: " . $update->error
-        ]);
-        $update->close();
-        $conn->close();
-        exit();
-    }
-
-    if ($update->affected_rows === 0) {
-        $check = $conn->prepare("SELECT id FROM service_tasks WHERE id = ?");
-        if ($check === false) {
-            http_response_code(500);
-            echo json_encode([
-                "success" => false,
-                "message" => "Verifikimi i detyrës dështoi: " . $conn->error
-            ]);
-            $update->close();
-            $conn->close();
-            exit();
+    if ($method === 'GET') {
+        if ($role === 'client' && $user['vehicle_id'] === null) {
+            app_json_response(['success' => true, 'data' => []]);
         }
 
-        $check->bind_param("i", $id);
-        $check->execute();
-        $check->store_result();
-        $taskExists = $check->num_rows > 0;
-        $check->close();
-
-        if (!$taskExists) {
-            http_response_code(404);
-            echo json_encode([
-                "success" => false,
-                "message" => "Detyra nuk u gjet."
-            ]);
-            $update->close();
-            $conn->close();
-            exit();
-        }
-    }
-
-    echo json_encode([
-        "success" => true,
-        "message" => "Statusi u përditësua!",
-        "status" => $status
-    ]);
-    $update->close();
-    $conn->close();
-    exit();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
-
-    if (!$id || $id < 1) {
-        http_response_code(400);
-        echo json_encode([
-            "success" => false,
-            "message" => "ID e detyrës nuk është e vlefshme."
-        ]);
-        $conn->close();
-        exit();
-    }
-
-    $delete = $conn->prepare("DELETE FROM service_tasks WHERE id = ?");
-    if ($delete === false) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "message" => "Përgatitja e fshirjes dështoi: " . $conn->error
-        ]);
-        $conn->close();
-        exit();
-    }
-
-    $delete->bind_param("i", $id);
-    if (!$delete->execute()) {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "message" => "Fshirja e detyrës dështoi: " . $delete->error
-        ]);
-        $delete->close();
-        $conn->close();
-        exit();
-    }
-
-    if ($delete->affected_rows === 0) {
-        http_response_code(404);
-        echo json_encode([
-            "success" => false,
-            "message" => "Detyra nuk u gjet."
-        ]);
-        $delete->close();
-        $conn->close();
-        exit();
-    }
-
-    echo json_encode([
-        "success" => true,
-        "message" => "Detyra u fshi me sukses."
-    ]);
-    $delete->close();
-    $conn->close();
-    exit();
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode([
-        "success" => false,
-        "error" => "METHOD_NOT_ALLOWED",
-        "message" => "Metoda e kërkesës nuk lejohet."
-    ]);
-    $conn->close();
-    exit();
-}
-
-// 2. Pranim i të dhënave JSON nga Postman
-$data = json_decode(file_get_contents("php://input"), true);
-
-if (!empty($data['title']) && !empty($data['vehicle_id'])) {
-    $title = $conn->real_escape_string($data['title']);
-    $vehicle_id = (int)$data['vehicle_id'];
-    $assigned_to = isset($data['assigned_to']) ? (int)$data['assigned_to'] : NULL;
-    $status = isset($data['status']) ? $conn->real_escape_string($data['status']) : 'TODO';
-
-    // 3. Ruajtja e task-ut në MySQL
-    $sql = "INSERT INTO service_tasks (vehicle_id, assigned_to, title, status) VALUES ('$vehicle_id', " . ($assigned_to ? "'$assigned_to'" : "NULL") . ", '$title', '$status')";
-
-    if ($conn->query($sql) === TRUE) {
-        $new_task_id = $conn->insert_id;
-
-        // 4. Dërgimi i Email-it përmes Resend API
-        $resendApiKey = getenv("RESEND_API_KEY");
-
-        $emailData = [
-            "from" => "onboarding@resend.dev",
-            "to" => ["adhurimmehmetii2006@gmail.com"],
-            "subject" => "Auto Pro - Detyrë e re Servisi #{$new_task_id}",
-            "html" => "
-                <h2>Përshëndetje Adhurim,</h2>
-                <p>Është krijuar me sukses një detyrë e re servisi në sistemin <strong>Auto Pro</strong>:</p>
-                <ul>
-                    <li><strong>ID e Detyrës:</strong> #{$new_task_id}</li>
-                    <li><strong>Titulli:</strong> {$title}</li>
-                    <li><strong>ID e Veturës:</strong> {$vehicle_id}</li>
-                    <li><strong>Statusi:</strong> {$status}</li>
-                </ul>
-                <p>Numri i kontaktit: 045916042</p>
-            "
-        ];
-
-        $response = null;
-        $curlError = null;
-        $httpCode = 0;
-        if ($resendApiKey) {
-            $ch = curl_init("https://api.resend.com/emails");
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer " . $resendApiKey,
-                "Content-Type: application/json"
-            ]);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($emailData));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-            $response = curl_exec($ch);
-            $curlError = curl_error($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+        if ($role === 'client') {
+            $statement = $conn->prepare(
+                'SELECT id, vehicle_id, assigned_to, title, status
+                 FROM service_tasks WHERE vehicle_id = ? ORDER BY created_at DESC'
+            );
+            $vehicleId = (int) $user['vehicle_id'];
+            $statement->bind_param('i', $vehicleId);
+            $statement->execute();
+            $result = $statement->get_result();
         } else {
-            $curlError = "RESEND_API_KEY is not configured.";
+            $result = $conn->query(
+                'SELECT id, vehicle_id, assigned_to, title, status
+                 FROM service_tasks ORDER BY created_at DESC'
+            );
         }
 
-        $email_sent = ($httpCode >= 200 && $httpCode < 300);
-
-        http_response_code(201);
-        echo json_encode([
-            "success" => true,
-            "message" => $email_sent
-                ? "Task-u u ruajt me sukses në databazë dhe email-i u dërgua!"
-                : "Task-u u ruajt në databazë, por dërgimi i email-it dështoi.",
-            "task_id" => $new_task_id,
-            "resend_http_code" => $httpCode,
-            "resend_details" => ($response !== null ? json_decode($response) : null) ?? $curlError
-        ]);
-    } else {
-        http_response_code(500);
-        echo json_encode([
-            "success" => false,
-            "error" => "QUERY_ERROR",
-            "message" => "Dështoi ruajtja në databazë: " . $conn->error
-        ]);
+        $tasks = [];
+        while ($task = $result->fetch_assoc()) {
+            $tasks[] = $task;
+        }
+        app_json_response(['success' => true, 'data' => $tasks]);
     }
-} else {
-    http_response_code(400);
-    echo json_encode([
-        "success" => false,
-        "error" => "VALIDATION_ERROR",
-        "message" => "Titulli dhe ID e veturës janë të detyrueshme."
-    ]);
-}
 
-$conn->close();
-?>
+    if ($method === 'POST' || $method === 'PUT') {
+        if (!in_array($role, ['admin', 'mechanic'], true)) {
+            app_json_response(['success' => false, 'message' => 'Nuk keni leje për këtë veprim.'], 403);
+        }
+    } elseif ($method === 'DELETE') {
+        if ($role !== 'admin') {
+            app_json_response(['success' => false, 'message' => 'Vetëm Administratori mund të fshijë detyra.'], 403);
+        }
+    } else {
+        app_json_response(['success' => false, 'message' => 'Metoda e kërkesës nuk lejohet.'], 405);
+    }
+
+    app_require_csrf();
+    $data = app_request_data();
+
+    if ($method === 'PUT') {
+        $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+        $status = $data['status'] ?? null;
+        $allowedStatuses = ['TODO', 'IN_PROGRESS', 'DONE'];
+        if (!$id || $id < 1 || !is_string($status) || !in_array($status, $allowedStatuses, true)) {
+            app_json_response(['success' => false, 'message' => 'ID dhe statusi i vlefshëm janë të detyrueshme.'], 400);
+        }
+
+        $update = $conn->prepare('UPDATE service_tasks SET status = ? WHERE id = ?');
+        $update->bind_param('si', $status, $id);
+        $update->execute();
+        if ($update->affected_rows === 0) {
+            $check = $conn->prepare('SELECT id FROM service_tasks WHERE id = ?');
+            $check->bind_param('i', $id);
+            $check->execute();
+            $check->store_result();
+            if ($check->num_rows === 0) {
+                app_json_response(['success' => false, 'message' => 'Detyra nuk u gjet.'], 404);
+            }
+        }
+        app_json_response(['success' => true, 'message' => 'Statusi u përditësua!', 'status' => $status]);
+    }
+
+    if ($method === 'DELETE') {
+        $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id || $id < 1) {
+            app_json_response(['success' => false, 'message' => 'ID e detyrës nuk është e vlefshme.'], 400);
+        }
+        $delete = $conn->prepare('DELETE FROM service_tasks WHERE id = ?');
+        $delete->bind_param('i', $id);
+        $delete->execute();
+        if ($delete->affected_rows === 0) {
+            app_json_response(['success' => false, 'message' => 'Detyra nuk u gjet.'], 404);
+        }
+        app_json_response(['success' => true, 'message' => 'Detyra u fshi me sukses.']);
+    }
+
+    $title = trim((string) ($data['title'] ?? ''));
+    $vehicleId = filter_var($data['vehicle_id'] ?? null, FILTER_VALIDATE_INT);
+    $assignedTo = isset($data['assigned_to'])
+        ? filter_var($data['assigned_to'], FILTER_VALIDATE_INT)
+        : null;
+    $status = (string) ($data['status'] ?? 'TODO');
+    if ($title === '' || mb_strlen($title) > 255 || !$vehicleId || $vehicleId < 1) {
+        app_json_response(['success' => false, 'message' => 'Titulli dhe ID e vlefshme e veturës janë të detyrueshme.'], 400);
+    }
+    if ($assignedTo !== null && (!$assignedTo || $assignedTo < 1)) {
+        app_json_response(['success' => false, 'message' => 'ID e mekanikut nuk është e vlefshme.'], 400);
+    }
+    if (!in_array($status, ['TODO', 'IN_PROGRESS', 'DONE'], true)) {
+        app_json_response(['success' => false, 'message' => 'Statusi nuk është i vlefshëm.'], 400);
+    }
+
+    if ($assignedTo === null) {
+        $insert = $conn->prepare(
+            'INSERT INTO service_tasks (vehicle_id, assigned_to, title, status) VALUES (?, NULL, ?, ?)'
+        );
+        $insert->bind_param('iss', $vehicleId, $title, $status);
+    } else {
+        $insert = $conn->prepare(
+            'INSERT INTO service_tasks (vehicle_id, assigned_to, title, status) VALUES (?, ?, ?, ?)'
+        );
+        $insert->bind_param('iiss', $vehicleId, $assignedTo, $title, $status);
+    }
+    $insert->execute();
+    $newTaskId = $conn->insert_id;
+
+    $resendApiKey = getenv('RESEND_API_KEY');
+    $safeTitle = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $emailData = [
+        'from' => 'onboarding@resend.dev',
+        'to' => ['adhurimmehmetii2006@gmail.com'],
+        'subject' => "Auto Pro - Detyrë e re Servisi #{$newTaskId}",
+        'html' => "
+            <h2>Përshëndetje Adhurim,</h2>
+            <p>Është krijuar me sukses një detyrë e re servisi në sistemin <strong>Auto Pro</strong>:</p>
+            <ul>
+                <li><strong>ID e Detyrës:</strong> #{$newTaskId}</li>
+                <li><strong>Titulli:</strong> {$safeTitle}</li>
+                <li><strong>ID e Vetures:</strong> {$vehicleId}</li>
+                <li><strong>Statusi:</strong> {$status}</li>
+            </ul>
+            <p>Numri i kontaktit: 045916042</p>
+        ",
+    ];
+
+    $response = null;
+    $curlError = null;
+    $httpCode = 0;
+    if ($resendApiKey) {
+        $ch = curl_init('https://api.resend.com/emails');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $resendApiKey,
+            'Content-Type: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($emailData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    } else {
+        $curlError = 'RESEND_API_KEY is not configured.';
+    }
+
+    $emailSent = $httpCode >= 200 && $httpCode < 300;
+    http_response_code(201);
+    echo json_encode([
+        'success' => true,
+        'message' => $emailSent
+            ? 'Detyra u ruajt me sukses në databazë dhe email-i u dërgua!'
+            : 'Detyra u ruajt në databazë, por dërgimi i email-it dështoi.',
+        'task_id' => $newTaskId,
+        'resend_http_code' => $httpCode,
+        'resend_details' => (is_string($response) ? json_decode($response) : null) ?? $curlError,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+} catch (Throwable $error) {
+    app_api_error($error);
+}

@@ -52,8 +52,8 @@ Endpoint-i `backend/api/tasks.php` përdor aktualisht `localhost`, përdoruesin 
 ## Funksionet
 
 - Klientët mund të regjistrohen, të kyçen, të kërkojnë termine dhe të shohin historikun/statusin e rezervimeve.
-- Administratorët mund të menaxhojnë rezervimet, klientët, rolet dhe shërbimet.
-- Detyrat e servisit ngarkohen nga databaza, filtrohen sipas statusit, mund të përditësohen duke klikuar statusin dhe mund të fshihen pas konfirmimit.
+- Administratorët mund të menaxhojnë rezervimet, klientët, rolet, ID-të e veturave dhe shërbimet.
+- Detyrat e servisit kërkojnë kyçje. Klientët shohin vetëm detyrat e veturës së caktuar; administratorët dhe mekanikët mund të shtojnë ose përditësojnë detyra, ndërsa vetëm administratorët mund t'i fshijnë.
 - Rezervimet ruhen në MySQL. EmailJS dërgon njoftim për rezervimin në adresën e autoservisit.
 
 ## API-të
@@ -61,11 +61,11 @@ Endpoint-i `backend/api/tasks.php` përdor aktualisht `localhost`, përdoruesin 
 - `backend/api/auth.php` — regjistrim, kyçje, dalje, sesioni aktual dhe token CSRF.
 - `backend/api/bookings.php` — listim, krijim dhe përditësim i rezervimeve.
 - `backend/api/services.php` — listim dhe menaxhim i shërbimeve.
-- `backend/api/users.php` — listim përdoruesish dhe menaxhim i roleve.
+- `backend/api/users.php` — listim përdoruesish, menaxhim i roleve dhe caktim i ID-së së veturës.
 - `backend/api/tasks.php` — detyrat e servisit:
-  - `GET` — liston detyrat.
-  - `POST` — krijon detyrë dhe, nëse është konfiguruar, dërgon njoftim me email.
-  - `PUT` — ndryshon statusin (`TODO`, `IN_PROGRESS`, `DONE`).
-  - `DELETE` — fshin detyrën sipas ID-së.
+  - `GET` — kërkon kyçje; klienti sheh vetëm veturën e lidhur me llogarinë e tij.
+  - `POST` — vetëm administratori ose mekaniku mund të krijojë detyrë; kërkohet token CSRF.
+  - `PUT` — vetëm administratori ose mekaniku mund të ndryshojë statusin (`TODO`, `IN_PROGRESS`, `DONE`); kërkohet token CSRF.
+  - `DELETE` — vetëm administratori mund të fshijë detyrën; kërkohet token CSRF.
 
-> **Shënim për publikim:** `tasks.php` nuk kërkon kyçje apo token CSRF për veprimet `POST`, `PUT` dhe `DELETE`. Para publikimit në internet, kufizo këto veprime për përdorues të autorizuar dhe aktivizo mbrojtjen CSRF.
+Rolet dhe ID-ja e veturës lexohen nga llogaria në databazë, jo nga të dhënat e dërguara prej shfletuesit. Cakto ID-në e veturës së klientit në panelin e administratorit që filtrimi i detyrave të funksionojë.

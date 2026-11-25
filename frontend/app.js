@@ -20,6 +20,7 @@ const bookingAuthRequired = document.getElementById("booking-auth-required");
 const serviceSelect = document.getElementById("service");
 const apiBase = "../backend/api/";
 let csrfToken;
+let currentUser;
 let serviceTasks = [];
 
 const taskStatusLabels = {
@@ -32,10 +33,10 @@ async function loadTasks() {
   const taskList = document.getElementById("task-list");
 
   try {
-    const response = await fetch(`${apiBase}tasks.php`);
+    const response = await fetch(`${apiBase}tasks.php`, { credentials: "same-origin" });
     const result = await response.json();
     if (!response.ok || !result.success || !Array.isArray(result.data)) {
-      throw new Error(result.message || "Lista e detyrave nuk u ngarkua.");
+      throw new Error(result.message || result.error || "Lista e detyrave nuk u ngarkua.");
     }
 
     serviceTasks = result.data;
@@ -86,9 +87,10 @@ function renderTasks() {
     title.textContent = `#${task.id} – ${task.title}`;
 
     const isKnownStatus = Object.hasOwn(taskStatusLabels, task.status);
-    const status = document.createElement(isKnownStatus ? "button" : "span");
+    const canUpdateStatus = currentUser.role === "admin" || currentUser.role === "mechanic";
+    const status = document.createElement(isKnownStatus && canUpdateStatus ? "button" : "span");
     status.className = `task-status task-status-${task.status}`;
-    if (isKnownStatus) {
+    if (isKnownStatus && canUpdateStatus) {
       status.type = "button";
       status.dataset.taskId = task.id;
       status.dataset.status = task.status;
@@ -105,22 +107,72 @@ function renderTasks() {
 
     card.append(heading, details);
 
-    const actions = document.createElement("div");
-    actions.className = "task-card-actions";
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "task-delete-button";
-    deleteButton.dataset.deleteTaskId = task.id;
-    deleteButton.textContent = "Fshi detyrën";
-    deleteButton.setAttribute("aria-label", `Fshi detyrën #${task.id}`);
-    actions.append(deleteButton);
-    card.append(actions);
+    if (currentUser.role === "admin") {
+      const actions = document.createElement("div");
+      actions.className = "task-card-actions";
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "task-delete-button";
+      deleteButton.dataset.deleteTaskId = task.id;
+      deleteButton.textContent = "Fshi detyrën";
+      deleteButton.setAttribute("aria-label", `Fshi detyrën #${task.id}`);
+      actions.append(deleteButton);
+      card.append(actions);
+    }
     return card;
   });
   taskList.replaceChildren(...cards);
 }
 
-loadTasks();
+function showTaskLoginNotice() {
+  const taskList = document.getElementById("task-list");
+  const notice = document.createElement("p");
+  notice.className = "empty-state";
+  notice.append(
+    document.createTextNode("Kyçu për të parë detyrat e servisit. "),
+    Object.assign(document.createElement("a"), {
+      href: "../login.php",
+      textContent: "Kyçu",
+    })
+  );
+  taskList.replaceChildren(notice);
+  document.getElementById("task-count").textContent = "";
+}
+
+async function initializeTasks() {
+  try {
+    const [sessionResponse, csrfResponse] = await Promise.all([
+      fetch(`${apiBase}auth.php?action=me`, { credentials: "same-origin" }),
+      fetch(`${apiBase}auth.php?action=csrf`, { credentials: "same-origin" }),
+    ]);
+    const [sessionData, csrfData] = await Promise.all([
+      sessionResponse.json(),
+      csrfResponse.json(),
+    ]);
+    if (!sessionResponse.ok || !csrfResponse.ok) {
+      throw new Error(sessionData.error || csrfData.error || "Sesioni nuk u ngarkua.");
+    }
+    currentUser = sessionData.user;
+    csrfToken = csrfData.csrfToken;
+    if (!currentUser) {
+      showTaskLoginNotice();
+      return;
+    }
+    await loadTasks();
+  } catch (error) {
+    console.error("Could not initialize service tasks:", error);
+    const taskList = document.getElementById("task-list");
+    taskList.replaceChildren(
+      Object.assign(document.createElement("p"), {
+        className: "empty-state",
+        textContent: error instanceof Error ? error.message : "Lista e detyrave nuk u ngarkua.",
+      })
+    );
+    document.getElementById("task-count").textContent = "";
+  }
+}
+
+initializeTasks();
 
 document.getElementById("task-status-filter").addEventListener("change", renderTasks);
 
@@ -139,12 +191,16 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
     try {
       const response = await fetch(`${apiBase}tasks.php`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
         body: JSON.stringify({ id }),
       });
       const result = await response.json();
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Detyra nuk u fshi.");
+        throw new Error(result.message || result.error || "Detyra nuk u fshi.");
       }
 
       updateStatus.textContent = result.message;
@@ -179,7 +235,11 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
   try {
     const response = await fetch(`${apiBase}tasks.php`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
       body: JSON.stringify({
         id: Number(button.dataset.taskId),
         status: nextStatus,
@@ -187,7 +247,7 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
     });
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || "Statusi nuk u përditësua.");
+      throw new Error(result.message || result.error || "Statusi nuk u përditësua.");
     }
 
     updateStatus.textContent = result.message;
