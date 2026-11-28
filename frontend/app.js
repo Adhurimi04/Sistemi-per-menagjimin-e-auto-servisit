@@ -22,6 +22,11 @@ const apiBase = "../backend/api/";
 let csrfToken;
 let currentUser;
 let serviceTasks = [];
+let serviceCatalog = [];
+
+const taskForm = document.getElementById("task-form");
+const taskFormStatus = document.getElementById("task-form-status");
+const servicePreset = document.getElementById("service-preset");
 
 const taskStatusLabels = {
   TODO: "Në pritje",
@@ -40,6 +45,8 @@ async function loadTasks() {
     }
 
     serviceTasks = result.data;
+    serviceCatalog = Array.isArray(result.catalog) ? result.catalog : [];
+    populateServicePresets();
     renderTasks();
   } catch (error) {
     console.error("Could not load service tasks:", error);
@@ -107,9 +114,28 @@ function renderTasks() {
 
     card.append(heading, details);
 
+    const taskPrice = Number(task.price);
+    const hasPrice = Number.isFinite(taskPrice) && taskPrice > 0;
+    const price = document.createElement("p");
+    price.className = hasPrice ? "task-price" : "task-price task-price-unset";
+    price.textContent = hasPrice
+      ? `${taskPrice.toFixed(2)} € (TVSH 18% e përfshirë)`
+      : "Çmimi nuk është caktuar";
+    card.append(price);
+
+    const actions = document.createElement("div");
+    actions.className = "task-card-actions";
+    if (hasPrice) {
+      const invoiceButton = document.createElement("button");
+      invoiceButton.type = "button";
+      invoiceButton.className = "task-invoice-button";
+      invoiceButton.dataset.invoiceTaskId = task.id;
+      invoiceButton.textContent = "Fatura PDF";
+      invoiceButton.setAttribute("aria-label", `Shkarko faturën PDF për detyrën #${task.id}`);
+      actions.append(invoiceButton);
+    }
+
     if (currentUser.role === "admin") {
-      const actions = document.createElement("div");
-      actions.className = "task-card-actions";
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
       deleteButton.className = "task-delete-button";
@@ -117,11 +143,161 @@ function renderTasks() {
       deleteButton.textContent = "Fshi detyrën";
       deleteButton.setAttribute("aria-label", `Fshi detyrën #${task.id}`);
       actions.append(deleteButton);
-      card.append(actions);
     }
+    card.append(actions);
     return card;
   });
   taskList.replaceChildren(...cards);
+}
+
+function populateServicePresets() {
+  const options = serviceCatalog.map((service) => {
+    const price = Number(service.default_price);
+    return new Option(
+      `${service.service_name} (${price.toFixed(2)} €)`,
+      String(service.id)
+    );
+  });
+  servicePreset.replaceChildren(new Option("Shërbim me porosi", ""), ...options);
+}
+
+function downloadInvoicePDF(task) {
+  const JsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!JsPDF) {
+    throw new Error("Libraria e faturës PDF nuk u ngarkua. Kontrollo lidhjen me internetin.");
+  }
+
+  const price = Number(task.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Çmimi i detyrës nuk është i vlefshëm.");
+  }
+
+  const doc = new JsPDF();
+  if (typeof doc.autoTable !== "function") {
+    throw new Error("Tabela e faturës PDF nuk u ngarkua.");
+  }
+
+  const vatRate = 0.18;
+  const netAmount = price / (1 + vatRate);
+  const vatAmount = price - netAmount;
+  const today = new Intl.DateTimeFormat("sq-XK").format(new Date());
+  const invoiceNumber = `AP-${new Date().getFullYear()}-${String(task.id).padStart(4, "0")}`;
+
+  doc.setFillColor(17, 24, 39);
+  doc.rect(0, 0, 210, 42, "F");
+  doc.setFillColor(239, 68, 68);
+  doc.rect(0, 42, 210, 2.5, "F");
+  doc.setFillColor(239, 68, 68);
+  doc.roundedRect(15, 9, 18, 18, 3, 3, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("AP", 24, 21, { align: "center" });
+  doc.setFontSize(22);
+  doc.text("AUTO PRO.", 39, 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(209, 213, 219);
+  doc.text("Autoservis & Vulkanizer Profesional | Prizren, Kosovë", 15, 32);
+  doc.text("Tel: +383 45 916 042 | Web: www.autopro-pz.com", 15, 38);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("FATURË SERVISI", 195, 16, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(252, 165, 165);
+  doc.text(`Nr. faturës: ${invoiceNumber}`, 195, 25, { align: "right" });
+  doc.setTextColor(209, 213, 219);
+  doc.text(`Data: ${today}`, 195, 33, { align: "right" });
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(15, 52, 180, 28, 3, 3, "FD");
+  doc.setTextColor(30, 41, 59);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("TË DHËNAT E VETURËS DHE SERVISIT", 20, 60);
+  doc.setFont("helvetica", "normal");
+  doc.text(`ID e veturës: #${task.vehicle_id}`, 20, 70);
+  doc.text(`Mekaniku: ${task.assigned_to || "Stafi Auto Pro"}`, 120, 70);
+  doc.text(`Statusi: ${taskStatusLabels[task.status] || task.status}`, 20, 76);
+  doc.text("Monedha: EUR (€)", 120, 76);
+
+  doc.autoTable({
+    startY: 88,
+    head: [["Nr.", "Përshkrimi i shërbimit", "Sasia", "Çmimi", "Totali"]],
+    body: [[
+      "1",
+      task.title,
+      "1",
+      `${price.toFixed(2)} €`,
+      `${price.toFixed(2)} €`,
+    ]],
+    theme: "grid",
+    headStyles: {
+      fillColor: [30, 41, 59],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    bodyStyles: {
+      textColor: [15, 23, 42],
+      fontSize: 9,
+      cellPadding: 4,
+    },
+    columnStyles: {
+      0: { halign: "center" },
+      2: { halign: "center" },
+      3: { halign: "right" },
+      4: { halign: "right", fontStyle: "bold" },
+    },
+  });
+
+  let summaryY = doc.lastAutoTable.finalY + 10;
+  if (summaryY > 220) {
+    doc.addPage();
+    summaryY = 25;
+  }
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(115, summaryY, 80, 38, 2, 2, "FD");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Vlera pa TVSH:", 120, summaryY + 8);
+  doc.text(`${netAmount.toFixed(2)} €`, 190, summaryY + 8, { align: "right" });
+  doc.text("TVSH (18%):", 120, summaryY + 16);
+  doc.text(`${vatAmount.toFixed(2)} €`, 190, summaryY + 16, { align: "right" });
+  doc.setDrawColor(239, 68, 68);
+  doc.line(120, summaryY + 20, 190, summaryY + 20);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(17, 24, 39);
+  doc.text("TOTALI PËR PAGESË:", 120, summaryY + 30);
+  doc.setTextColor(220, 38, 38);
+  doc.text(`${price.toFixed(2)} €`, 190, summaryY + 30, { align: "right" });
+
+  const signatureY = summaryY + 58;
+  if (signatureY < 270) {
+    doc.setDrawColor(148, 163, 184);
+    doc.line(20, signatureY, 80, signatureY);
+    doc.line(130, signatureY, 190, signatureY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Nënshkrimi & Vula (Auto Pro)", 50, signatureY + 5, { align: "center" });
+    doc.text("Nënshkrimi i klientit", 160, signatureY + 5, { align: "center" });
+  }
+  doc.setFontSize(8);
+  doc.text(
+    "Faleminderit që zgjodhët Auto Pro Prizren! Faturë elektronike.",
+    105,
+    285,
+    { align: "center" }
+  );
+  doc.save(`Fatura_${invoiceNumber}_Vetura_${task.vehicle_id}.pdf`);
 }
 
 function showTaskLoginNotice() {
@@ -158,6 +334,12 @@ async function initializeTasks() {
       showTaskLoginNotice();
       return;
     }
+    if (currentUser.role === "admin" || currentUser.role === "mechanic") {
+      taskForm.hidden = false;
+      if (currentUser.vehicle_id) {
+        document.getElementById("task-vehicle-id").value = currentUser.vehicle_id;
+      }
+    }
     await loadTasks();
   } catch (error) {
     console.error("Could not initialize service tasks:", error);
@@ -176,7 +358,71 @@ initializeTasks();
 
 document.getElementById("task-status-filter").addEventListener("change", renderTasks);
 
+servicePreset.addEventListener("change", () => {
+  const service = serviceCatalog.find((item) => String(item.id) === servicePreset.value);
+  if (!service) return;
+  document.getElementById("task-title").value = service.service_name;
+  document.getElementById("task-price").value = Number(service.default_price).toFixed(2);
+});
+
+taskForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submit = taskForm.querySelector('button[type="submit"]');
+  const formData = new FormData(taskForm);
+  submit.disabled = true;
+  taskFormStatus.textContent = "Detyra po ruhet...";
+  taskFormStatus.dataset.state = "pending";
+  try {
+    const assignedTo = String(formData.get("assigned_to")).trim();
+    const response = await fetch(`${apiBase}tasks.php`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({
+        title: String(formData.get("title")).trim(),
+        vehicle_id: Number(formData.get("vehicle_id")),
+        assigned_to: assignedTo ? Number(assignedTo) : null,
+        price: String(formData.get("price")),
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || result.error || "Detyra nuk u ruajt.");
+    }
+    taskForm.reset();
+    taskFormStatus.textContent = result.message;
+    taskFormStatus.dataset.state = "success";
+    await loadTasks();
+  } catch (error) {
+    console.error("Could not create service task:", error);
+    taskFormStatus.textContent =
+      error instanceof Error ? error.message : "Gabim gjatë ruajtjes së detyrës.";
+    taskFormStatus.dataset.state = "error";
+  } finally {
+    submit.disabled = false;
+  }
+});
+
 document.getElementById("task-list").addEventListener("click", async (event) => {
+  const invoiceButton = event.target.closest("button[data-invoice-task-id]");
+  if (invoiceButton) {
+    const task = serviceTasks.find(
+      (item) => Number(item.id) === Number(invoiceButton.dataset.invoiceTaskId)
+    );
+    if (!task) return;
+    try {
+      downloadInvoicePDF(task);
+    } catch (error) {
+      document.getElementById("task-update-status").textContent =
+        error instanceof Error ? error.message : "Fatura PDF nuk u krijua.";
+      document.getElementById("task-update-status").dataset.state = "error";
+    }
+    return;
+  }
+
   const deleteButton = event.target.closest("button[data-delete-task-id]");
   if (deleteButton) {
     const id = Number(deleteButton.dataset.deleteTaskId);

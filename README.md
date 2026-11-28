@@ -54,6 +54,9 @@ Endpoint-i `backend/api/tasks.php` përdor aktualisht `localhost`, përdoruesin 
 - Klientët mund të regjistrohen, të kyçen, të kërkojnë termine dhe të shohin historikun/statusin e rezervimeve.
 - Administratorët mund të menaxhojnë rezervimet, klientët, rolet, ID-të e veturave dhe shërbimet.
 - Detyrat e servisit kërkojnë kyçje. Klientët shohin vetëm detyrat e veturës së caktuar; administratorët dhe mekanikët mund të shtojnë ose përditësojnë detyra, ndërsa vetëm administratorët mund t'i fshijnë.
+- Administratorët dhe mekanikët mund të zgjedhin shërbime me çmim të paracaktuar ose të vendosin çmim të personalizuar. Lista e çmimeve dhe kolona e re e çmimit krijohen nga `tasks.php` pa fshirë të dhënat ekzistuese.
+- Detyrat shfaqin çmimin total me TVSH 18% të përfshirë dhe mund të shkarkohen si faturë PDF nga shfletuesi. Bibliotekat jsPDF/AutoTable ngarkohen nga CDN, prandaj kërkohet internet për gjenerimin e faturës.
+- PDF-ja përdor të dhënat e kontaktit të dhëna në projekt; plotëso të dhënat fiskale/ligjore të biznesit para përdorimit si faturë zyrtare.
 - Rezervimet ruhen në MySQL. EmailJS dërgon njoftim për rezervimin në adresën e autoservisit.
 
 ## API-të
@@ -63,8 +66,8 @@ Endpoint-i `backend/api/tasks.php` përdor aktualisht `localhost`, përdoruesin 
 - `backend/api/services.php` — listim dhe menaxhim i shërbimeve.
 - `backend/api/users.php` — listim përdoruesish, menaxhim i roleve dhe caktim i ID-së së veturës.
 - `backend/api/tasks.php` — detyrat e servisit:
-  - `GET` — kërkon kyçje; klienti sheh vetëm veturën e lidhur me llogarinë e tij.
-  - `POST` — vetëm administratori ose mekaniku mund të krijojë detyrë; kërkohet token CSRF.
+  - `GET` — kërkon kyçje; klienti sheh vetëm veturën e lidhur me llogarinë e tij. Përfshin çmimet e detyrave dhe katalogun e shërbimeve.
+  - `POST` — vetëm administratori ose mekaniku mund të krijojë detyrë me çmim; kërkohet token CSRF.
   - `PUT` — vetëm administratori ose mekaniku mund të ndryshojë statusin (`TODO`, `IN_PROGRESS`, `DONE`); kërkohet token CSRF.
   - `DELETE` — vetëm administratori mund të fshijë detyrën; kërkohet token CSRF.
 
