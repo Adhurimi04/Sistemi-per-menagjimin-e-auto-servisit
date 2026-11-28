@@ -23,6 +23,8 @@ let csrfToken;
 let currentUser;
 let serviceTasks = [];
 let serviceCatalog = [];
+let taskListLoaded = false;
+let taskLoadInProgress = false;
 
 const taskForm = document.getElementById("task-form");
 const taskFormStatus = document.getElementById("task-form-status");
@@ -34,22 +36,32 @@ const taskStatusLabels = {
   DONE: "Përfunduar",
 };
 
-async function loadTasks() {
+async function loadTasks({ quiet = false } = {}) {
+  if (taskLoadInProgress) return;
+  taskLoadInProgress = true;
   const taskList = document.getElementById("task-list");
 
   try {
-    const response = await fetch(`${apiBase}tasks.php`, { credentials: "same-origin" });
+    const response = await fetch(`${apiBase}tasks.php`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
     const result = await response.json();
     if (!response.ok || !result.success || !Array.isArray(result.data)) {
       throw new Error(result.message || result.error || "Lista e detyrave nuk u ngarkua.");
     }
 
+    const tasksChanged = JSON.stringify(serviceTasks) !== JSON.stringify(result.data);
     serviceTasks = result.data;
     serviceCatalog = Array.isArray(result.catalog) ? result.catalog : [];
     populateServicePresets();
-    renderTasks();
+    if (!taskListLoaded || tasksChanged) {
+      renderTasks();
+      taskListLoaded = true;
+    }
   } catch (error) {
     console.error("Could not load service tasks:", error);
+    if (quiet) return;
     taskList.replaceChildren(
       Object.assign(document.createElement("p"), {
         className: "empty-state",
@@ -58,6 +70,8 @@ async function loadTasks() {
       })
     );
     document.getElementById("task-count").textContent = "";
+  } finally {
+    taskLoadInProgress = false;
   }
 }
 
@@ -132,7 +146,8 @@ function renderTasks() {
       invoiceButton.type = "button";
       invoiceButton.className = "task-invoice-button";
       invoiceButton.dataset.invoiceTaskId = task.id;
-      invoiceButton.textContent = "Fatura PDF";
+      invoiceButton.textContent =
+        currentUser.role === "client" ? "Shkarko faturën PDF" : "Fatura PDF";
       invoiceButton.setAttribute("aria-label", `Shkarko faturën PDF për detyrën #${task.id}`);
       actions.append(invoiceButton);
     }
@@ -343,6 +358,16 @@ async function initializeTasks() {
       }
     }
     await loadTasks();
+    if (currentUser.role === "client") {
+      document.getElementById("client-task-refresh-note").hidden = false;
+      const refreshClientTasks = () => {
+        if (document.visibilityState === "visible") {
+          loadTasks({ quiet: true });
+        }
+      };
+      window.setInterval(refreshClientTasks, 5000);
+      document.addEventListener("visibilitychange", refreshClientTasks);
+    }
   } catch (error) {
     console.error("Could not initialize service tasks:", error);
     const taskList = document.getElementById("task-list");
