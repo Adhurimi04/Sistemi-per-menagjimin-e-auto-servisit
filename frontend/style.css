@@ -1555,6 +1555,12 @@ img {
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
+.task-card select.task-status {
+  min-height: 32px;
+  padding: 5px 25px 5px 10px;
+  color-scheme: dark;
+}
+
 .task-status:hover {
   transform: scale(1.05);
   opacity: 0.9;

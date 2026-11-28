@@ -95,16 +95,18 @@ function renderTasks() {
 
     const isKnownStatus = Object.hasOwn(taskStatusLabels, task.status);
     const canUpdateStatus = currentUser.role === "admin" || currentUser.role === "mechanic";
-    const status = document.createElement(isKnownStatus && canUpdateStatus ? "button" : "span");
+    const status = document.createElement(isKnownStatus && canUpdateStatus ? "select" : "span");
     status.className = `task-status task-status-${task.status}`;
     if (isKnownStatus && canUpdateStatus) {
-      status.type = "button";
       status.dataset.taskId = task.id;
-      status.dataset.status = task.status;
-      status.title = "Kliko për të ndryshuar statusin";
+      status.title = "Zgjedh statusin e detyrës";
       status.setAttribute("aria-label", `Ndrysho statusin: ${taskStatusLabels[task.status]}`);
+      for (const [value, label] of Object.entries(taskStatusLabels)) {
+        status.add(new Option(label, value, false, value === task.status));
+      }
+    } else {
+      status.textContent = taskStatusLabels[task.status] || task.status;
     }
-    status.textContent = taskStatusLabels[task.status] || task.status;
     heading.append(title, status);
 
     const details = document.createElement("p");
@@ -463,18 +465,18 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
     return;
   }
 
-  const button = event.target.closest("button[data-task-id]");
-  if (!button) return;
+});
 
-  const nextStatus = {
-    TODO: "IN_PROGRESS",
-    IN_PROGRESS: "DONE",
-    DONE: "TODO",
-  }[button.dataset.status];
-  if (!nextStatus) return;
+document.getElementById("task-list").addEventListener("change", async (event) => {
+  const select = event.target.closest("select[data-task-id]");
+  if (!select) return;
+
+  const task = serviceTasks.find((item) => Number(item.id) === Number(select.dataset.taskId));
+  const nextStatus = select.value;
+  if (!task || !Object.hasOwn(taskStatusLabels, nextStatus) || nextStatus === task.status) return;
 
   const updateStatus = document.getElementById("task-update-status");
-  button.disabled = true;
+  select.disabled = true;
   updateStatus.textContent = "Duke përditësuar statusin...";
   updateStatus.dataset.state = "pending";
 
@@ -487,7 +489,7 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
         "X-CSRF-Token": csrfToken,
       },
       body: JSON.stringify({
-        id: Number(button.dataset.taskId),
+        id: Number(select.dataset.taskId),
         status: nextStatus,
       }),
     });
@@ -501,11 +503,12 @@ document.getElementById("task-list").addEventListener("click", async (event) => 
     await loadTasks();
   } catch (error) {
     console.error("Could not update service task status:", error);
+    select.value = task.status;
     updateStatus.textContent =
       error instanceof Error ? error.message : "Gabim gjatë ndryshimit të statusit.";
     updateStatus.dataset.state = "error";
   } finally {
-    if (button.isConnected) button.disabled = false;
+    if (select.isConnected) select.disabled = false;
   }
 });
 
